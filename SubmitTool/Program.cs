@@ -338,7 +338,7 @@ namespace SubmitTool
                     Console.WriteLine($"展開中: {s}");
                     flag = true;
                     added.Add(s);
-                    var path = $"Libraries\\{s.Replace('.', '\\')}.cs";
+                    var path = $"Libraries/{s.Replace('.', '/')}.cs";
                     var libSourceLines = await File.ReadAllLinesAsync(path);
                     var libSource = string.Join("\n", libSourceLines);
                     var libUsing = usingRegex.Matches(libSource).Select(Func).ToHashSet();
@@ -443,7 +443,7 @@ namespace SubmitTool
             {
                 var newInfo = new ProcessStartInfo("dotnet.exe", "new console --no-restore")
                 {
-                    WorkingDirectory = Directory.GetCurrentDirectory() + "\\tmp",
+                    WorkingDirectory = Directory.GetCurrentDirectory() + "/tmp",
                     RedirectStandardOutput = true
                 };
                 var task = Process.Start(newInfo);
@@ -451,12 +451,12 @@ namespace SubmitTool
                 Console.WriteLine("プロジェクトを作成中...");
                 task.WaitForExit();
                 await File.WriteAllTextAsync(
-                    "tmp\\Program.cs",
+                    "tmp/Program.cs",
                     source
                 );
                 compilerInfo = new ProcessStartInfo("dotnet.exe", "publish -c Release -o . -v q --nologo")
                 {
-                    WorkingDirectory = Environment.CurrentDirectory + "\\tmp",
+                    WorkingDirectory = $"{Environment.CurrentDirectory}/tmp",
                     RedirectStandardOutput = true
                 };
             }
