@@ -678,8 +678,11 @@ namespace SubmitTool
         {
             using var client = new HttpClient();
             var request = new HttpRequestMessage(HttpMethod.Get, url);
-            var cookies = _cookies.Select(x => $"{x.Key}={x.Value}");
-            request.Headers.Add("Cookie", string.Join("; ",cookies));
+            if (_cookies != null) {
+                var cookies = _cookies.Select(x => $"{x.Key}={x.Value}");
+                request.Headers.Add("Cookie", string.Join("; ", cookies));
+            }
+            
             var res = await client.SendAsync(request);
             _cookies = ExtractCookies(res.Headers);
             return res;
