@@ -25,7 +25,7 @@ namespace SubmitTool
                 Console.Write("> ");
                 var args = Console.ReadLine().Split(' ', StringSplitOptions.RemoveEmptyEntries);
                 if (args.Length == 0) continue;
-                bool noMinimize;
+                bool minimize;
                 switch (args[0])
                 {
                     case "exit":
@@ -58,8 +58,8 @@ namespace SubmitTool
                         }
 
                         bool force = args.Skip(2).Any(a => a == "--force" || a == "-F");
-                        noMinimize = args.Skip(2).Any(a => a == "--no-minimize");
-                        await program.Run(args[1], true, force, !noMinimize);
+                        minimize = args.Skip(2).Any(a => a == "--minimize");
+                        await program.Run(args[1], true, force, minimize);
                         break;
                     case "r":
                     case "run":
@@ -77,8 +77,8 @@ namespace SubmitTool
                         program.Change(args[1]);
                         break;
                     case "expand":
-                        noMinimize = args.Length > 1 && args.Skip(1).Any(a => a == "--no-minimize");
-                        await Expand(!noMinimize);
+                        minimize = args.Length > 1 && args.Skip(1).Any(a => a == "--minimize");
+                        await Expand(minimize);
                         break;
                     default:
                         Console.WriteLine("無効なコマンドです");
@@ -175,7 +175,7 @@ namespace SubmitTool
             int count;
             while (!int.TryParse(Console.ReadLine(), out count) || count < 0 || count > 100)
             {
-                Console.WriteLine("正しい数値を入力してくださ。");
+                Console.WriteLine("正しい数値を入力してください。");
                 Console.Write("問題数: ");
             }
 
@@ -211,7 +211,7 @@ namespace SubmitTool
             _contestName = contestName;
             _tasks = list;
             Console.WriteLine(string.Join("\n", list.Select(x => $"{x.Key}:{x.Value}")));
-            File.WriteAllLines(path, list.Select(x => $"{x.Key}\t{x.Value}"));
+            await File.WriteAllLinesAsync(path, list.Select(x => $"{x.Key}\t{x.Value}"));
         }
 
         private void Load(string contestName)
