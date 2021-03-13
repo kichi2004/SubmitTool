@@ -15,8 +15,9 @@ namespace SubmitTool
 {
     public class Program
     {
-        static async Task Main()
-        {
+        static async Task Main() {
+            _dotnetPath = Environment.OSVersion.Platform == PlatformID.Unix ? "dotnet" : _dotnetPath;
+            
             var program = new Program();
             await program.Initialize();
             while (true)
@@ -92,6 +93,7 @@ namespace SubmitTool
         private static readonly Regex _regex = new Regex("<input type=\"hidden\" name=\"csrf_token\" value=\"(\\S+)\" \\/>");
         private IReadOnlyDictionary<string, string> _cookies;
         private string _languageId = "4010";
+        private static string _dotnetPath;
 
         public async Task Initialize()
         {
@@ -441,7 +443,7 @@ namespace SubmitTool
             var expand = source.Contains("Solve.Libraries");
             if (expand)
             {
-                var newInfo = new ProcessStartInfo("dotnet.exe", "new console --no-restore")
+                var newInfo = new ProcessStartInfo(_dotnetPath, "new console --no-restore")
                 {
                     WorkingDirectory = Directory.GetCurrentDirectory() + "/tmp",
                     RedirectStandardOutput = true
@@ -454,7 +456,7 @@ namespace SubmitTool
                     "tmp/Program.cs",
                     source
                 );
-                compilerInfo = new ProcessStartInfo("dotnet.exe", "publish -c Release -o . -v q --nologo")
+                compilerInfo = new ProcessStartInfo(_dotnetPath, "publish -c Release -o . -v q --nologo")
                 {
                     WorkingDirectory = $"{Environment.CurrentDirectory}/tmp",
                     RedirectStandardOutput = true
@@ -462,7 +464,7 @@ namespace SubmitTool
             }
             else
             {
-                compilerInfo = new ProcessStartInfo("dotnet.exe", "publish -c Release -o tmp -v q --nologo")
+                compilerInfo = new ProcessStartInfo(_dotnetPath, "publish -c Release -o tmp -v q --nologo")
                 {
                     WorkingDirectory = Environment.CurrentDirectory,
                     RedirectStandardOutput = true
@@ -471,6 +473,7 @@ namespace SubmitTool
             Console.WriteLine("コンパイル中...");
             var compilerProcess = Process.Start(compilerInfo);
             var compilerOutput = await compilerProcess.StandardOutput.ReadToEndAsync();
+            compilerProcess.WaitForExit();
             var code = compilerProcess.ExitCode;
             if (code != 0)
             {
@@ -481,7 +484,9 @@ namespace SubmitTool
 
             Console.WriteLine("コンパイル成功");
 
-            var info = new ProcessStartInfo(expand ? "tmp/tmp.exe" : "tmp/AtCoder.exe")
+            var path = expand ? "tmp/tmp" : "tmp/AtCoder";
+            if (Environment.OSVersion.Platform != PlatformID.Unix) path += ".exe";
+            var info = new ProcessStartInfo(path)
             {
                 WorkingDirectory = Environment.CurrentDirectory + "/tmp",
                 RedirectStandardOutput = true,
