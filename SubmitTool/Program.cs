@@ -26,54 +26,80 @@ namespace SubmitTool
                 var args = Console.ReadLine().Split(' ', StringSplitOptions.RemoveEmptyEntries);
                 if (args.Length == 0) continue;
                 bool minimize;
-                switch (args[0])
-                {
+                switch (args[0]) {
                     case "exit":
                         await program.Destroy();
                         Exit();
                         break;
+
                     case "logout":
                         program.Logout();
                         break;
+
                     case "get":
-                        if(args.Length != 2)
-                        {
+                        if (args.Length != 2) {
                             Console.WriteLine("引数を指定してください");
                         }
 
                         await program.Get(args[1]);
                         break;
+
                     case "load":
-                        if(args.Length != 2)
-                        {
-                            Console.WriteLine("引数を指定してください");
-                        }
-                        program.Load(args[1]);
-                        break;
-                    case "s":
-                    case "submit":
-                        if(args.Length < 2)
-                        {
+                        if (args.Length != 2) {
                             Console.WriteLine("引数を指定してください");
                         }
 
-                        bool force = args.Skip(2).Any(a => a == "--force" || a == "-F");
-                        minimize = args.Skip(2).Any(a => a == "--minimize");
-                        await program.Run(args[1], true, force, minimize);
+                        program.Load(args[1]);
                         break;
+
+                    case "s":
+                    case "submit":
+                        if (args.Length < 2) {
+                            Console.WriteLine("引数を指定してください");
+                            break;
+                        }
+
+                        var options = args.Where(x => x.StartsWith("-")).ToHashSet();
+
+                        bool force = options.Contains("--force") || options.Contains("-F");
+                        minimize = options.Contains("--minimize");
+
+                        var argsWithoutOptions = args.Where(x => !x.StartsWith("-")).ToArray();
+
+                        if (argsWithoutOptions.Length == 0) {
+                            Console.WriteLine("問題を指定してください");
+                            break;
+                        }
+
+                        var (contest, task) = argsWithoutOptions.Length == 1
+                            ? (null, argsWithoutOptions[0])
+                            : (argsWithoutOptions[0], argsWithoutOptions[1]);
+
+                        await program.Run(contest, task, true, force, minimize);
+                        break;
+
                     case "r":
                     case "run":
-                        if(args.Length != 2)
-                        {
+                        if (args.Length < 2) {
                             Console.WriteLine("引数を指定してください");
+                            break;
                         }
-                        await program.Run(args[1], false);
+
+                        if (args.Length == 0) {
+                            Console.WriteLine("問題を指定してください");
+                            break;
+                        }
+
+                        (contest, task) = args.Length == 2 ? (null, args[1]) : (args[1], args[2]);
+
+                        await program.Run(contest, task, false);
                         break;
+
                     case "change":
-                        if(args.Length != 2)
-                        {
+                        if (args.Length != 2) {
                             Console.WriteLine("引数を指定してください");
                         }
+
                         program.Change(args[1]);
                         break;
                     case "expand":
@@ -324,7 +350,7 @@ namespace SubmitTool
 
             Console.WriteLine("ライブラリを展開中...");
             var libraryRegex = new Regex(@"^using Solve\.Libraries\.([\w\.]+);", RegexOptions.Multiline);
-            var usingRegex = new Regex(@"^using (.+);", RegexOptions.Multiline);
+            var usingRegex = new Regex(@"^using (\S+);", RegexOptions.Multiline);
             var matches = libraryRegex.Matches(source);
             var usingSet = usingRegex.Matches(source).Select(Func).ToHashSet();
             var newUsing = new List<string>();
@@ -404,24 +430,16 @@ namespace SubmitTool
             }
         }
 
-        private async Task Run(string taskName, bool submit = true, bool forceSubmit = false, bool minimize = true)
-        {
-            taskName = taskName.ToUpper();
-            if (_contestName == null)
-            {
-                Error("コンテストが読み込まれていません。");
-                return;
-            }
-            if (!_tasks.ContainsKey(taskName))
-            {
-                Error("指定された問題は存在しません。");
-                return;
-            }
+        private async Task RunInner(string contestName,
+            string taskName,
+            bool submit = true,
+            bool forceSubmit = false,
+            bool minimize = true
+        ) {
             
-            var name = _tasks[taskName];
             var samples = new List<(int, string, string)>();
             {
-                var task = await HttpGetString($"https://atcoder.jp/contests/{_contestName}/tasks/{name}");
+                var task = await HttpGetString($"https://atcoder.jp/contests/{contestName}/tasks/{taskName}");
                 task = task.Replace("\r\n", "\n");
                 var regex = new Regex(
                     "<hr />\\n*<div class=\"part\">\\n*<section>\\n*<h3>Sample Input (\\d+)</h3><pre>([\\s\\S]+?)</pre>\\n*(?:<p>[\\s\\S]+?</p>\\n*)?</section>\\n*</div>\\n*<div class=\"part\">\\n*<section>\\n*<h3>Sample Output \\1</h3><pre>([\\s\\S]+?)</pre>\\n*?(?:[\\s\\S]+?\\n*)?</section>\\n*</div>",
@@ -440,7 +458,10 @@ namespace SubmitTool
             var source = string.Join("\n", await File.ReadAllLinesAsync("Solver.cs"));
 
             ProcessStartInfo compilerInfo;
+            
             var expand = source.Contains("Solve.Libraries");
+            string compileArgument = $"publish -c Release -o {(expand ? "." : "tmp")} -v q --nologo";
+            
             if (expand)
             {
                 var newInfo = new ProcessStartInfo(_dotnetPath, "new console --no-restore")
@@ -456,7 +477,7 @@ namespace SubmitTool
                     "tmp/Program.cs",
                     source
                 );
-                compilerInfo = new ProcessStartInfo(_dotnetPath, "publish -c Release -o . -v q --nologo")
+                compilerInfo = new ProcessStartInfo(_dotnetPath, compileArgument)
                 {
                     WorkingDirectory = $"{Environment.CurrentDirectory}/tmp",
                     RedirectStandardOutput = true
@@ -464,7 +485,7 @@ namespace SubmitTool
             }
             else
             {
-                compilerInfo = new ProcessStartInfo(_dotnetPath, "publish -c Release -o tmp -v q --nologo")
+                compilerInfo = new ProcessStartInfo(_dotnetPath, compileArgument)
                 {
                     WorkingDirectory = Environment.CurrentDirectory,
                     RedirectStandardOutput = true
@@ -484,10 +505,11 @@ namespace SubmitTool
 
             Console.WriteLine("コンパイル成功");
 
-            var path = expand ? "tmp/tmp" : "tmp/AtCoder";
-            if (Environment.OSVersion.Platform != PlatformID.Unix) path += ".exe";
-            var info = new ProcessStartInfo(path)
+            var path = Path.Combine(Environment.CurrentDirectory, "tmp", expand ? "tmp.dll" : "AtCoder.dll");
+            
+            var info = new ProcessStartInfo(_dotnetPath)
             {
+                Arguments = path,
                 WorkingDirectory = Environment.CurrentDirectory + "/tmp",
                 RedirectStandardOutput = true,
                 RedirectStandardInput = true,
@@ -535,7 +557,29 @@ namespace SubmitTool
                         var expeced = output.Split(null as char[], StringSplitOptions.RemoveEmptyEntries);
                         var result = res.Split(null as char[], StringSplitOptions.RemoveEmptyEntries);
 
-                        if (expeced.SequenceEqual(result))
+                        bool isOk = true;
+                        float? maxError = null;
+                        if (expeced.Length == result.Length) {
+                            for (int i = 0; i < expeced.Length; ++i) {
+                                if ((expeced[i].Contains('.') || result[i].Contains('.')) &&
+                                    double.TryParse(expeced[i], out var exDouble) &&
+                                    double.TryParse(result[i], out var reDouble)) {
+
+                                    var error = Math.Min(Math.Abs(reDouble - exDouble),
+                                        Math.Abs(reDouble - exDouble) / exDouble);
+
+                                    if (maxError == null || maxError < error) maxError = (float?) error;
+
+                                    if (error > 1e-7) isOk = false;
+                                } else {
+                                    isOk &= expeced[i].Equals(result[i]);
+                                }
+                            }
+                        } else {
+                            isOk = false;
+                        }
+
+                        if (isOk)
                         {
                             WriteLine(" A C ", ConsoleColor.Black, ConsoleColor.Green);
                         }
@@ -549,6 +593,10 @@ namespace SubmitTool
                             Console.ForegroundColor = ConsoleColor.Red;
                             Console.WriteLine($"実際の出力:\n{res}");
                             Console.ForegroundColor = _clr;
+                        }
+                        
+                        if (maxError.HasValue) {
+                            Console.WriteLine($"実数の最大誤差: {maxError.Value}");
                         }
 
                         Console.WriteLine($"実行時間: {sw.ElapsedMilliseconds} ms");
@@ -612,7 +660,7 @@ namespace SubmitTool
 
             var post = new Dictionary<string, string>
             {
-                {"data.TaskScreenName", name},
+                {"data.TaskScreenName", taskName},
                 {"data.LanguageId", _languageId},
                 {"sourceCode", source},
                 {"csrf_token", token}
@@ -637,8 +685,28 @@ namespace SubmitTool
             {
                 Error("提出に失敗しました。");
             }
+        }
 
+        private async Task Run(string contest, string taskName, bool submit = true, bool forceSubmit = false, bool minimize = true) {
+            string name;
+            if (contest is null) {
+                taskName = taskName.ToUpper();
+                if (_contestName == null) {
+                    Error("コンテストが読み込まれていません。");
+                    return;
+                }
+
+                contest = _contestName;
+                if (!_tasks.ContainsKey(taskName)) {
+                    Error("指定された問題は存在しません。");
+                    return;
+                }
+                name = _tasks[taskName];
+            } else {
+                name = $"{contest.Replace('-', '_')}_{taskName.ToLower()}";
+            }
             
+            await RunInner(contest, name, submit, forceSubmit, minimize);
         }
 
         private void Logout()
