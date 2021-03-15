@@ -37,16 +37,26 @@ namespace SubmitTool
                         break;
 
                     case "get":
-                        if (args.Length != 2) {
-                            Console.WriteLine("引数を指定してください");
+                        if (args.Length < 2) {
+                            Console.WriteLine("Usage: get [コンテスト名] (問題数)");
+                            break;
                         }
 
-                        await program.Get(args[1]);
+                        int number = -1;
+                        if (args.Length > 2 && int.TryParse(args[2], out number)) {
+                            if (number < 0 || number > 100) {
+                                Console.WriteLine("問題数に正しい数値を指定してください");
+                                break;
+                            }
+                        }
+
+                        await program.Get(args[1], number);
                         break;
 
                     case "load":
                         if (args.Length != 2) {
-                            Console.WriteLine("引数を指定してください");
+                            Console.WriteLine("Usage: load [コンテスト名]");
+                            break;
                         }
 
                         program.Load(args[1]);
@@ -54,8 +64,12 @@ namespace SubmitTool
 
                     case "s":
                     case "submit":
+                        string usage = $"Usage: {args[0]} (コンテスト名) [問題] (オプション)\n" +
+                                       "【オプション】\n" +
+                                       "--force / -F: テストケースを実行せず提出\n" +
+                                       "--minimize: ソースコードを最小化する";
                         if (args.Length < 2) {
-                            Console.WriteLine("引数を指定してください");
+                            Console.WriteLine(usage);
                             break;
                         }
 
@@ -67,7 +81,7 @@ namespace SubmitTool
                         var argsWithoutOptions = args.Where(x => !x.StartsWith("-")).ToArray();
 
                         if (argsWithoutOptions.Length == 0) {
-                            Console.WriteLine("問題を指定してください");
+                            Console.WriteLine(usage);
                             break;
                         }
 
@@ -81,12 +95,7 @@ namespace SubmitTool
                     case "r":
                     case "run":
                         if (args.Length < 2) {
-                            Console.WriteLine("引数を指定してください");
-                            break;
-                        }
-
-                        if (args.Length == 0) {
-                            Console.WriteLine("問題を指定してください");
+                            Console.WriteLine($"Usage: {args[0]} (コンテスト名) [問題]\n");
                             break;
                         }
 
@@ -97,7 +106,8 @@ namespace SubmitTool
 
                     case "change":
                         if (args.Length != 2) {
-                            Console.WriteLine("引数を指定してください");
+                            Console.WriteLine("Usage: change [言語ID]");
+                            break;
                         }
 
                         program.Change(args[1]);
@@ -181,7 +191,7 @@ namespace SubmitTool
             }
         }
         
-        public async Task Get(string contestName)
+        public async Task Get(string contestName, int count)
         {
             var response = await HttpGet("https://atcoder.jp/contests/" + contestName);
             if (response.StatusCode == HttpStatusCode.NotFound)
@@ -196,22 +206,13 @@ namespace SubmitTool
                 return;
             }
 
-            Console.WriteLine("問題数を入力してください。(0を入力すると自動で取得します。)");
-            Console.Write("問題数: ");
-            int count;
-            while (!int.TryParse(Console.ReadLine(), out count) || count < 0 || count > 100)
-            {
-                Console.WriteLine("正しい数値を入力してください。");
-                Console.Write("問題数: ");
-            }
-
             if (!Directory.Exists("config")) Directory.CreateDirectory("config");
             if (!Directory.Exists("config/contests")) Directory.CreateDirectory("config/contests");
             
             var list = new Dictionary<string, string>();
             var path = $"config/contests/{contestName}";
 
-            if (count == 0)
+            if (count == -1)
             {
                 Console.WriteLine("問題名を取得中...");
                 var standings = await HttpGetString($"https://atcoder.jp/contests/{contestName}/standings/json");
