@@ -80,14 +80,14 @@ namespace SubmitTool
 
                         var argsWithoutOptions = args.Where(x => !x.StartsWith("-")).ToArray();
 
-                        if (argsWithoutOptions.Length == 0) {
+                        if (argsWithoutOptions.Length == 1) {
                             Console.WriteLine(usage);
                             break;
                         }
 
-                        var (contest, task) = argsWithoutOptions.Length == 1
-                            ? (null, argsWithoutOptions[0])
-                            : (argsWithoutOptions[0], argsWithoutOptions[1]);
+                        var (contest, task) = argsWithoutOptions.Length == 2
+                            ? (null, argsWithoutOptions[1])
+                            : (argsWithoutOptions[1], argsWithoutOptions[2]);
 
                         await program.Run(contest, task, true, force, minimize);
                         break;
@@ -129,7 +129,7 @@ namespace SubmitTool
         private static readonly Regex _regex = new Regex("<input type=\"hidden\" name=\"csrf_token\" value=\"(\\S+)\" \\/>");
         private IReadOnlyDictionary<string, string> _cookies;
         private string _languageId = "4010";
-        private static string _dotnetPath;
+        private static string _dotnetPath = "dotnet";
 
         public async Task Initialize()
         {
@@ -443,7 +443,7 @@ namespace SubmitTool
                 var task = await HttpGetString($"https://atcoder.jp/contests/{contestName}/tasks/{taskName}");
                 task = task.Replace("\r\n", "\n");
                 var regex = new Regex(
-                    "<hr />\\n*<div class=\"part\">\\n*<section>\\n*<h3>Sample Input (\\d+)</h3><pre>([\\s\\S]+?)</pre>\\n*(?:<p>[\\s\\S]+?</p>\\n*)?</section>\\n*</div>\\n*<div class=\"part\">\\n*<section>\\n*<h3>Sample Output \\1</h3><pre>([\\s\\S]+?)</pre>\\n*?(?:[\\s\\S]+?\\n*)?</section>\\n*</div>",
+                    "<hr />\\n*<div class=\"part\">\\n*<section>\\n*<h3>入力例 (\\d+)</h3><pre>([\\s\\S]+?)</pre>\\n*(?:<p>[\\s\\S]+?</p>\\n*)?</section>\\n*</div>\\n*<div class=\"part\">\\n*<section>\\n*<h3>出力例 \\1</h3><pre>([\\s\\S]+?)</pre>\\n*?(?:[\\s\\S]+?\\n*)?</section>\\n*</div>",
                     RegexOptions.Multiline
                 );
                 var matches = regex.Matches(task);
@@ -495,7 +495,7 @@ namespace SubmitTool
             Console.WriteLine("コンパイル中...");
             var compilerProcess = Process.Start(compilerInfo);
             var compilerOutput = await compilerProcess.StandardOutput.ReadToEndAsync();
-            compilerProcess.WaitForExit();
+            await compilerProcess.WaitForExitAsync();
             var code = compilerProcess.ExitCode;
             if (code != 0)
             {
@@ -564,7 +564,10 @@ namespace SubmitTool
                             for (int i = 0; i < expeced.Length; ++i) {
                                 if ((expeced[i].Contains('.') || result[i].Contains('.')) &&
                                     double.TryParse(expeced[i], out var exDouble) &&
-                                    double.TryParse(result[i], out var reDouble)) {
+                                    double.TryParse(result[i], out var reDouble))
+                                {
+
+                                    if (double.IsNaN(reDouble)) isOk = false;
 
                                     var error = Math.Min(Math.Abs(reDouble - exDouble),
                                         Math.Abs(reDouble - exDouble) / exDouble);
@@ -650,7 +653,7 @@ namespace SubmitTool
             }
 
             Console.WriteLine("提出しています...");
-            string url = $"https://atcoder.jp/contests/{_contestName}/submit";
+            string url = $"https://atcoder.jp/contests/{contestName}/submit";
             var page = await HttpGetString(url);
             var token = ExtractCsrfToken(page);
             if (token == null)
