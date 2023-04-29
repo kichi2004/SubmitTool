@@ -16,6 +16,7 @@ namespace SubmitTool
     public class Program
     {
         static async Task Main() {
+            Console.OutputEncoding = Encoding.UTF8;
             _dotnetPath = Environment.OSVersion.Platform == PlatformID.Unix ? "dotnet" : _dotnetPath;
             
             var program = new Program();
@@ -473,7 +474,7 @@ namespace SubmitTool
                 var task = Process.Start(newInfo);
                 source = await ExpandInner(source, minimize);
                 Console.WriteLine("プロジェクトを作成中...");
-                task.WaitForExit();
+                await task.WaitForExitAsync();
                 await File.WriteAllTextAsync(
                     "tmp/Program.cs",
                     source
