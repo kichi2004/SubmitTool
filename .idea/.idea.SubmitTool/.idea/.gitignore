@@ -1,0 +1,11 @@
+# デフォルトの無視ファイル
+/shelf/
+/workspace.xml
+# Rider ignored files
+/contentModel.xml
+/.idea.SubmitTool.iml
+/modules.xml
+/projectSettingsUpdater.xml
+# データソースのローカルストレージがファイルを無視しました
+/dataSources/
+/dataSources.local.xml
