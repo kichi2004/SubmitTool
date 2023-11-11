@@ -15,7 +15,7 @@ namespace SubmitTool
 {
     public class Program
     {
-        static async Task Main() {
+        private static async Task Main() {
             Console.OutputEncoding = Encoding.UTF8;
             _dotnetPath = Environment.OSVersion.Platform == PlatformID.Unix ? "dotnet" : _dotnetPath;
             
@@ -24,7 +24,7 @@ namespace SubmitTool
             while (true)
             {
                 Console.Write("> ");
-                var args = Console.ReadLine().Split(' ', StringSplitOptions.RemoveEmptyEntries);
+                var args = Console.ReadLine()!.Split(' ', StringSplitOptions.RemoveEmptyEntries);
                 if (args.Length == 0) continue;
                 bool minimize;
                 switch (args[0]) {
@@ -124,12 +124,12 @@ namespace SubmitTool
             }
         }
 
-        private string _contestName;
-        private IReadOnlyDictionary<string, string> _tasks;
-        private string _userName;
-        private static readonly Regex _regex = new Regex("<input type=\"hidden\" name=\"csrf_token\" value=\"(\\S+)\" \\/>");
-        private IReadOnlyDictionary<string, string> _cookies;
-        private string _languageId = "4010";
+        private string? _contestName;
+        private IReadOnlyDictionary<string, string>? _tasks;
+        private string? _userName;
+        private static readonly Regex Regex = new("<input type=\"hidden\" name=\"csrf_token\" value=\"(\\S+)\" />");
+        private IReadOnlyDictionary<string, string>? _cookies;
+        private string _languageId = "5003";
         private static string _dotnetPath = "dotnet";
 
         public async Task Initialize()
@@ -159,7 +159,7 @@ namespace SubmitTool
                         break;
                     }
 
-                    var session = ParseSession(_cookies["REVEL_SESSION"]);
+                    var session = ParseSession(_cookies!["REVEL_SESSION"]);
                     if (!session.ContainsKey("UserScreenName"))
                     {
                         Console.WriteLine("ログイン情報の取得に失敗しました。");
@@ -182,11 +182,11 @@ namespace SubmitTool
             }
         }
 
-        public async Task Destroy()
+        private async Task Destroy()
         {
             if (!Directory.Exists("config")) Directory.CreateDirectory("config");
             if (!Directory.Exists("config/cookies")) Directory.CreateDirectory("config/cookies");
-            foreach (var (key, value) in _cookies)
+            foreach (var (key, value) in _cookies!)
             {
                 await File.WriteAllTextAsync($"config/cookies/{key}", value);
             }
@@ -217,7 +217,7 @@ namespace SubmitTool
             {
                 Console.WriteLine("問題名を取得中...");
                 var standings = await HttpGetString($"https://atcoder.jp/contests/{contestName}/standings/json");
-                var matches = new Regex("{\"Assignment\":\"(\\w+)\",\"TaskName\":\".*?\",\"TaskScreenName\":\"(\\w+)\"}")
+                var matches = new Regex("\\{\"Assignment\":\"(\\w+)\",\"TaskName\":\".*?\",\"TaskScreenName\":\"(\\w+)\"}")
                     .Matches(standings);
                 Console.WriteLine($"問題数: {matches.Count}問");
                 foreach (Match match in matches)
@@ -274,17 +274,18 @@ namespace SubmitTool
             var res = await response.Content.ReadAsStringAsync();
             _cookies = ExtractCookies(response.Headers);
             var token = ExtractCsrfToken(res);
-            if (res == null)
+            if (token == null)
             {
                 Error("csrf_tokenの取得に失敗しました。");
+                Environment.Exit(1);
             }
             while (true)
             {
                 var sw = Stopwatch.StartNew();
                 Console.Write("ユーザ名: ");
-                var username = Console.ReadLine();
+                var username = Console.ReadLine()!;
                 Console.Write("パスワード: ");
-                var password = Console.ReadLine();
+                var password = Console.ReadLine()!;
                 Console.CursorTop --;
                 Console.CursorLeft = 0;
                 Console.WriteLine("パスワード: " + new string('*', password.Length));
@@ -296,14 +297,14 @@ namespace SubmitTool
                 }
                 sw.Stop();
 
-                var param = new Dictionary<string, string>
+                var param = new Dictionary<string, string?>
                 {
                     {"username", username},
                     {"password", password},
                     {"csrf_token", token}
                 };
 
-                HttpResponseMessage loginRes = null;
+                HttpResponseMessage? loginRes = null;
                 for (int i = 0; i < 10; i++)
                 {
                     if (i > 0)
@@ -317,8 +318,10 @@ namespace SubmitTool
                             Error("csrf_tokenの取得に失敗しました。");
                             continue;
                         }
+                        param["csrf_token"] = token;
+                        
+                        await Task.Delay(5000);
                     }
-                    await Task.Delay(5000);
                     loginRes = await HttpPost(url, param);
                     if (loginRes.StatusCode == HttpStatusCode.OK)
                     {
@@ -329,7 +332,7 @@ namespace SubmitTool
                     await Task.Delay(100);
                 }
 
-                if (loginRes.StatusCode != HttpStatusCode.OK)
+                if (loginRes!.StatusCode != HttpStatusCode.OK)
                     Error("ログインに失敗しました。", true);
                 var s = await loginRes.Content.ReadAsStringAsync();
                 if (s.Contains("ユーザ名またはパスワードが正しくありません。") || s.Contains("Username or Password is incorrect."))
@@ -342,7 +345,7 @@ namespace SubmitTool
             }
 
             Console.WriteLine("ログインしました。");
-            var session = ParseSession(_cookies["REVEL_SESSION"]);
+            var session = ParseSession(_cookies!["REVEL_SESSION"]);
             _userName = session["UserScreenName"];
         }
 
@@ -474,7 +477,7 @@ namespace SubmitTool
                 var task = Process.Start(newInfo);
                 source = await ExpandInner(source, minimize);
                 Console.WriteLine("プロジェクトを作成中...");
-                await task.WaitForExitAsync();
+                await task!.WaitForExitAsync();
                 await File.WriteAllTextAsync(
                     "tmp/Program.cs",
                     source
@@ -495,7 +498,7 @@ namespace SubmitTool
             }
             Console.WriteLine("コンパイル中...");
             var compilerProcess = Process.Start(compilerInfo);
-            var compilerOutput = await compilerProcess.StandardOutput.ReadToEndAsync();
+            var compilerOutput = await compilerProcess!.StandardOutput.ReadToEndAsync();
             await compilerProcess.WaitForExitAsync();
             var code = compilerProcess.ExitCode;
             if (code != 0)
@@ -519,20 +522,6 @@ namespace SubmitTool
                 UseShellExecute = false
             };
 
-            static void WriteLine(string msg,
-                ConsoleColor foreground = ConsoleColor.Black,
-                ConsoleColor background = ConsoleColor.White
-            )
-            {
-                var _for = Console.ForegroundColor;
-                var _bac = Console.BackgroundColor;
-                Console.ForegroundColor = foreground;
-                Console.BackgroundColor = background;
-                Console.WriteLine(msg);
-                Console.ForegroundColor = _for;
-                Console.BackgroundColor = _bac;
-            }
-
             if (!forceSubmit)
             {
                 var status = 0;
@@ -541,7 +530,7 @@ namespace SubmitTool
                     Console.Write($"[Case {num}] ");
                     var proc = Process.Start(info);
                     var sw = Stopwatch.StartNew();
-                    await proc.StandardInput.WriteLineAsync(input);
+                    await proc!.StandardInput.WriteLineAsync(input);
                     var ok = proc.WaitForExit(3000);
                     sw.Stop();
                     if (ok)
@@ -663,7 +652,7 @@ namespace SubmitTool
                 return;
             }
 
-            var post = new Dictionary<string, string>
+            var post = new Dictionary<string, string?>
             {
                 {"data.TaskScreenName", taskName},
                 {"data.LanguageId", _languageId},
@@ -690,9 +679,26 @@ namespace SubmitTool
             {
                 Error("提出に失敗しました。");
             }
+
+            return;
+
+            static void WriteLine(string msg,
+                ConsoleColor foreground = ConsoleColor.Black,
+                ConsoleColor background = ConsoleColor.White
+            )
+            {
+                var fore = Console.ForegroundColor;
+                var back = Console.BackgroundColor;
+                Console.ForegroundColor = foreground;
+                Console.BackgroundColor = background;
+                Console.Write(msg);
+                Console.ForegroundColor = fore;
+                Console.BackgroundColor = back;
+                Console.WriteLine();
+            }
         }
 
-        private async Task Run(string contest, string taskName, bool submit = true, bool forceSubmit = false, bool minimize = true) {
+        private async Task Run(string? contest, string taskName, bool submit = true, bool forceSubmit = false, bool minimize = true) {
             string name;
             if (contest is null) {
                 taskName = taskName.ToUpper();
@@ -702,7 +708,7 @@ namespace SubmitTool
                 }
 
                 contest = _contestName;
-                if (!_tasks.ContainsKey(taskName)) {
+                if (!_tasks!.ContainsKey(taskName)) {
                     Error("指定された問題は存在しません。");
                     return;
                 }
@@ -725,16 +731,18 @@ namespace SubmitTool
         {
             var next = name switch
             {
-                "old" => "3006",
-                "new" => "4010",
-                "mcs" => "4011",
-                "csc" => "4012",
+                "current" => "5003",
+                "aot" => "5042",
+                "oldold" => "3006",
+                "old" => "4010",
+                "oldmcs" => "4011",
+                "oldcsc" => "4012",
                 _ => null
             };
 
             if (next == null)
             {
-                Console.WriteLine("'old', 'new', 'mcs', 'csc' のいずれかで入力してください。");
+                Console.WriteLine("'current' / 'aot' のいずれかで入力してください。");
                 return;
             }
 
@@ -745,7 +753,7 @@ namespace SubmitTool
         {
             using var client = new HttpClient();
             var request = new HttpRequestMessage(HttpMethod.Get, url);
-            var cookies = _cookies.Select(x => $"{x.Key}={x.Value}");
+            var cookies = _cookies!.Select(x => $"{x.Key}={x.Value}");
             request.Headers.Add("Cookie", string.Join("; ",cookies));
             var res = await client.SendAsync(request);
             _cookies = ExtractCookies(res.Headers);
@@ -766,24 +774,24 @@ namespace SubmitTool
             return res;
         }
 
-        private async Task<HttpResponseMessage> HttpPost(string url, Dictionary<string, string> content)
+        private async Task<HttpResponseMessage> HttpPost(string url, Dictionary<string, string?> content)
         {
             using var client = new HttpClient();
             var c = new FormUrlEncodedContent(content);
-            var cookies = _cookies.Select(p => $"{p.Key}={p.Value}");
+            var cookies = _cookies!.Select(p => $"{p.Key}={p.Value}");
             c.Headers.Add("Cookie", string.Join(";", cookies));
             var res = await client.PostAsync(url, c);
             _cookies = ExtractCookies(res.Headers);
             return res;
         }
 
-        private static string ExtractCsrfToken(string source)
+        private static string? ExtractCsrfToken(string source)
         {
-            var match = _regex.Match(source);
+            var match = Regex.Match(source);
             return !match.Success ? null : match.Groups[1].Value;
         }
 
-        private static IReadOnlyDictionary<string, string> ExtractCookies(HttpHeaders headers)
+        private static IReadOnlyDictionary<string, string>? ExtractCookies(HttpHeaders headers)
         {
             var res = headers.GetValues("Set-Cookie");
             return res?.Select(x =>
