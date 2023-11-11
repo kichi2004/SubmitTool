@@ -132,7 +132,7 @@ namespace SubmitTool
         private string _languageId = "5003";
         private static string _dotnetPath = "dotnet";
 
-        public async Task Initialize()
+        private async Task Initialize()
         {
             // クッキーがあるなら取得
             if (Directory.Exists("config/cookies"))
@@ -191,8 +191,8 @@ namespace SubmitTool
                 await File.WriteAllTextAsync($"config/cookies/{key}", value);
             }
         }
-        
-        public async Task Get(string contestName, int count)
+
+        private async Task Get(string contestName, int count)
         {
             var response = await HttpGet("https://atcoder.jp/contests/" + contestName);
             if (response.StatusCode == HttpStatusCode.NotFound)
@@ -545,15 +545,15 @@ namespace SubmitTool
                         }
 
                         var res = await proc.StandardOutput.ReadToEndAsync();
-                        var expeced = output.Split(null as char[], StringSplitOptions.RemoveEmptyEntries);
+                        var expected = output.Split(null as char[], StringSplitOptions.RemoveEmptyEntries);
                         var result = res.Split(null as char[], StringSplitOptions.RemoveEmptyEntries);
 
                         bool isOk = true;
                         float? maxError = null;
-                        if (expeced.Length == result.Length) {
-                            for (int i = 0; i < expeced.Length; ++i) {
-                                if ((expeced[i].Contains('.') || result[i].Contains('.')) &&
-                                    double.TryParse(expeced[i], out var exDouble) &&
+                        if (expected.Length == result.Length) {
+                            for (int i = 0; i < expected.Length; ++i) {
+                                if ((expected[i].Contains('.') || result[i].Contains('.')) &&
+                                    double.TryParse(expected[i], out var exDouble) &&
                                     double.TryParse(result[i], out var reDouble))
                                 {
 
@@ -566,7 +566,7 @@ namespace SubmitTool
 
                                     if (error > 1e-7) isOk = false;
                                 } else {
-                                    isOk &= expeced[i].Equals(result[i]);
+                                    isOk &= expected[i].Equals(result[i]);
                                 }
                             }
                         } else {
@@ -581,12 +581,12 @@ namespace SubmitTool
                         {
                             WriteLine(" W A ", ConsoleColor.Black, ConsoleColor.Yellow);
                             status = 1;
-                            var _clr = Console.ForegroundColor;
+                            var clr = Console.ForegroundColor;
                             Console.ForegroundColor = ConsoleColor.Blue;
                             Console.WriteLine($"正解:\n{output}");
                             Console.ForegroundColor = ConsoleColor.Red;
                             Console.WriteLine($"実際の出力:\n{res}");
-                            Console.ForegroundColor = _clr;
+                            Console.ForegroundColor = clr;
                         }
                         
                         if (maxError.HasValue) {
@@ -791,10 +791,10 @@ namespace SubmitTool
             return !match.Success ? null : match.Groups[1].Value;
         }
 
-        private static IReadOnlyDictionary<string, string>? ExtractCookies(HttpHeaders headers)
+        private static IReadOnlyDictionary<string, string> ExtractCookies(HttpHeaders headers)
         {
             var res = headers.GetValues("Set-Cookie");
-            return res?.Select(x =>
+            return res.Select(x =>
             {
                 var s = x.Split(';')[0].Split('=');
                 return new
@@ -812,12 +812,12 @@ namespace SubmitTool
 
         private static void Error(string message, bool exit = false)
         {
-            var _color = Console.ForegroundColor;
+            var color = Console.ForegroundColor;
             Console.ForegroundColor = ConsoleColor.Red;
             Console.WriteLine(message);
 
             if (exit) Environment.Exit(1);
-            else Console.ForegroundColor = _color;
+            else Console.ForegroundColor = color;
         }
 
         private static void Exit(int code = 0) => Environment.Exit(code);
